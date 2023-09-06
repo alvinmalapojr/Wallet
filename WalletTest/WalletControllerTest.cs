@@ -4,18 +4,25 @@ using Wallet.Controllers;
 using Wallet.Interfaces;
 using Wallet.Models;
 using FluentAssertions;
+using Wallet.Services;
+using System.Data.SqlClient;
+using Microsoft.Extensions.Configuration;
 
 namespace WalletTest
 {
     public class WalletControllerTest
     {
-        private Mock<IWalletInterface> _mockService;
-        private WalletController _controller;
+        private  IConfiguration _testConfiguration;
+        private  WalletController _controller;
+        private  IWalletInterface _walletService;
 
         public WalletControllerTest()
         {
-            _mockService = new Mock<IWalletInterface>();
-            _controller = new WalletController(_mockService.Object);
+            _testConfiguration = new ConfigurationBuilder()
+                .AddJsonFile("appsettings.json")
+                .Build();
+            _walletService = new WalletService(_testConfiguration);
+            _controller = new WalletController(_walletService);
         }
 
         #region Users
@@ -45,7 +52,6 @@ namespace WalletTest
         {
             //Arrange
             var accountNumber = "681398981506";
-            _mockService.Setup(service => service.GetUser(accountNumber)).ReturnsAsync(new User());
 
             // Act
             var response = await _controller.GetUsers(accountNumber);
@@ -61,7 +67,6 @@ namespace WalletTest
         {
             //Arrange
             var accountNumber = "68139898150688";
-            _mockService.Setup(service => service.GetUser(accountNumber)).ReturnsAsync(new User());
 
             // Act
             var result = await _controller.GetUsers(accountNumber);
@@ -102,7 +107,7 @@ namespace WalletTest
         {
             //Arrange
             var accountNumber = "770387836960";
-            _mockService.Setup(service => service.GetTransactions(accountNumber)).ReturnsAsync(new List<Transaction>());
+            //_mockService.Setup(service => service.GetTransactions(accountNumber)).ReturnsAsync(new List<Transaction>());
 
             // Act
             var response = await _controller.GetTransactions(accountNumber);
@@ -118,7 +123,7 @@ namespace WalletTest
         {
             //Arrange
             var accountNumber = "68139898150688";
-            _mockService.Setup(service => service.GetTransactions(accountNumber)).ReturnsAsync(new List<Transaction>());
+            //_mockService.Setup(service => service.GetTransactions(accountNumber)).ReturnsAsync(new List<Transaction>());
 
             // Act
             var result = await _controller.GetTransactions(accountNumber);
@@ -139,12 +144,11 @@ namespace WalletTest
             // Arrange
             var validUser = new Registration
             {
-                UserName = "testuser",
+                UserName = "testuser1",
+                FirstName = "first",
+                LastName = "last",
                 Password = "validpassword",
             };
-
-            _mockService.Setup(service => service.Register(validUser))
-                             .ReturnsAsync((int)TransactionResponseEnums.SUCCESS);
 
             // Act
             var result = await _controller.Register(validUser);
@@ -161,13 +165,12 @@ namespace WalletTest
             // Arrange
             var existingUser = new Registration
             {
-                UserName = "existinguser",
+                UserName = "mlpntn",
+                FirstName = "first",
+                LastName = "last",
                 Password = "password",
             };
-
-            _mockService.Setup(service => service.Register(existingUser))
-                             .ReturnsAsync((int)TransactionResponseEnums.USERNAME_EXIST);
-
+       
             // Act
             var result = await _controller.Register(existingUser);
 
@@ -183,14 +186,18 @@ namespace WalletTest
             // Arrange
             var userWithFailedRegistration = new Registration
             {
-
                 UserName = "faileduser",
+                FirstName = "first",
+                LastName = "last",
                 Password = "password",
             };
 
-            _mockService.Setup(service => service.Register(userWithFailedRegistration))
-                             .ReturnsAsync((int)TransactionResponseEnums.FAILED);
+            var _mockWalletService = new Mock<IWalletInterface>();
+            _controller = new WalletController(_mockWalletService.Object);
 
+            _mockWalletService.Setup(service => service.Register(userWithFailedRegistration))
+                             .ReturnsAsync((int)TransactionResponseEnums.FAILED);
+          
             // Act
             var result = await _controller.Register(userWithFailedRegistration);
 
@@ -207,10 +214,14 @@ namespace WalletTest
             var userWithException = new Registration
             {
                 UserName = "exceptionuser",
+                FirstName = "first",
+                LastName = "last",
                 Password = "password",
             };
-     
-            _mockService.Setup(service => service.Register(userWithException))
+
+            var _mockWalletService = new Mock<IWalletInterface>();
+            _controller = new WalletController(_mockWalletService.Object);
+            _mockWalletService.Setup(service => service.Register(userWithException))
                              .ThrowsAsync(new Exception("Some error occurred"));
 
             // Act
@@ -231,12 +242,9 @@ namespace WalletTest
             // Arrange
             var withdrawalRequest = new Withdraw
             {
-                AccountNumber = "nonexistentAccount",
+                AccountNumber = "6813989815069",
                 Amount = 100.0m,
             };
-
-            _mockService.Setup(service => service.Withdraw(withdrawalRequest))
-                             .ReturnsAsync((int)TransactionResponseEnums.ACCOUNT_DOES_NOT_EXIST);
 
             // Act
             var result = await _controller.Withdraw(withdrawalRequest);
@@ -253,13 +261,10 @@ namespace WalletTest
             // Arrange
             var withdrawalRequest = new Withdraw
             {
-                AccountNumber = "existingAccount",
-                Amount = 1000.0m, 
+                AccountNumber = "681398981506",
+                Amount = 10000.0m, 
             };
            
-            _mockService.Setup(service => service.Withdraw(withdrawalRequest))
-                             .ReturnsAsync((int)TransactionResponseEnums.BALANCE_INSUFFICIENT);
-
             // Act
             var result = await _controller.Withdraw(withdrawalRequest);
 
@@ -275,11 +280,13 @@ namespace WalletTest
             // Arrange
             var withdrawalRequest = new Withdraw
             {
-                AccountNumber = "existingAccount",
+                AccountNumber = "681398981506",
                 Amount = 100.0m,
             };
 
-            _mockService.Setup(service => service.Withdraw(withdrawalRequest))
+            var _mockWalletService = new Mock<IWalletInterface>();
+            _controller = new WalletController(_mockWalletService.Object);
+            _mockWalletService.Setup(service => service.Withdraw(withdrawalRequest))
                              .ReturnsAsync((int)TransactionResponseEnums.FAILED);
 
             // Act
@@ -297,12 +304,9 @@ namespace WalletTest
             // Arrange
             var withdrawalRequest = new Withdraw
             {
-                AccountNumber = "existingAccount",
+                AccountNumber = "681398981506",
                 Amount = 100.0m,
             };
-
-            _mockService.Setup(service => service.Withdraw(withdrawalRequest))
-                             .ReturnsAsync((int)TransactionResponseEnums.SUCCESS);
 
             // Act
             var result = await _controller.Withdraw(withdrawalRequest);
@@ -319,11 +323,13 @@ namespace WalletTest
             // Arrange
             var withdrawalRequest = new Withdraw
             {
-                AccountNumber = "existingAccount",
+                AccountNumber = "681398981506",
                 Amount = 100.0m,
             };
-    
-            _mockService.Setup(service => service.Withdraw(withdrawalRequest))
+
+            var _mockWalletService = new Mock<IWalletInterface>();
+            _controller = new WalletController(_mockWalletService.Object);
+            _mockWalletService.Setup(service => service.Withdraw(withdrawalRequest))
                              .ThrowsAsync(new Exception("Some error occurred"));
 
             // Act
@@ -340,15 +346,12 @@ namespace WalletTest
         [Fact]
         public async Task Deposit_WithAccountNotFound_ReturnsConflict()
         {
-            // Arrange
+            // Arrange : Change one Account Number which is not in the DB
             var depositRequest = new Deposit
             {
-                AccountNumber = "nonexistentAccount",
+                AccountNumber = "6813989815069",
                 Amount = 100.0m,
             };
-
-            _mockService.Setup(service => service.Deposit(depositRequest))
-                             .ReturnsAsync((int)TransactionResponseEnums.ACCOUNT_DOES_NOT_EXIST);
 
             // Act
             var result = await _controller.Deposit(depositRequest);
@@ -365,11 +368,13 @@ namespace WalletTest
             // Arrange
             var depositRequest = new Deposit
             {
-                AccountNumber = "existingAccount",
+                AccountNumber = "681398981506",
                 Amount = 100.0m,
             };
-        
-            _mockService.Setup(service => service.Deposit(depositRequest))
+
+            var _mockWalletService = new Mock<IWalletInterface>();
+            _controller = new WalletController(_mockWalletService.Object);
+            _mockWalletService.Setup(service => service.Deposit(depositRequest))
                              .ReturnsAsync((int)TransactionResponseEnums.FAILED);
 
             // Act
@@ -387,12 +392,9 @@ namespace WalletTest
             // Arrange
             var depositRequest = new Deposit
             {
-                AccountNumber = "existingAccount",
+                AccountNumber = "681398981506",
                 Amount = 100.0m,
             };
-
-            _mockService.Setup(service => service.Deposit(depositRequest))
-                             .ReturnsAsync((int)TransactionResponseEnums.SUCCESS);
 
             // Act
             var result = await _controller.Deposit(depositRequest);
@@ -409,12 +411,14 @@ namespace WalletTest
             // Arrange
             var depositRequest = new Deposit
             {
-                AccountNumber = "existingAccount",
+                AccountNumber = "681398981506",
                 Amount = 100.0m,
             };
-       
-            _mockService.Setup(service => service.Deposit(depositRequest))
-                             .ThrowsAsync(new Exception("Some error occurred"));
+
+            var _mockWalletService = new Mock<IWalletInterface>();
+            _controller = new WalletController(_mockWalletService.Object);
+            _mockWalletService.Setup(service => service.Deposit(depositRequest))
+                            .ThrowsAsync(new Exception("Some error occurred"));
 
             // Act
             var result = await _controller.Deposit(depositRequest);
@@ -426,22 +430,18 @@ namespace WalletTest
         }
         #endregion
 
-        #region
+        #region Transfer
         [Fact]
         public async Task Transfer_WithAccountNotFound_ReturnsConflict()
         {
-            // Arrange
+            // Arrange : Change one Account Number which is not in the DB
             var transferRequest = new Transfer
             {
-                AccountNumberFrom = "nonexistentAccount1",
-                AccountNumberTo = "nonexistentAccount2",
-                Amount = 100.0m,
-             
+                AccountNumberFrom = "6813989815069",
+                AccountNumberTo = "7703878369609",
+                Amount = 100.0m,       
             };
           
-            _mockService.Setup(service => service.Transfer(transferRequest))
-                             .ReturnsAsync((int)TransactionResponseEnums.ACCOUNT_DOES_NOT_EXIST);
-
             // Act
             var result = await _controller.Transfer(transferRequest);
 
@@ -457,14 +457,11 @@ namespace WalletTest
             // Arrange
             var transferRequest = new Transfer
             {
-                AccountNumberFrom = "existingAccount1",
-                AccountNumberTo = "existingAccount2",
-                Amount = 1000.0m,                            
+                AccountNumberFrom = "681398981506",
+                AccountNumberTo = "770387836960",
+                Amount = 10000.0m,                            
             };
       
-            _mockService.Setup(service => service.Transfer(transferRequest))
-                             .ReturnsAsync((int)TransactionResponseEnums.BALANCE_INSUFFICIENT);
-
             // Act
             var result = await _controller.Transfer(transferRequest);
 
@@ -480,12 +477,14 @@ namespace WalletTest
             // Arrange
             var transferRequest = new Transfer
             {
-                AccountNumberFrom = "existingAccount1",
-                AccountNumberTo = "existingAccount2",
+                AccountNumberFrom = "681398981506",
+                AccountNumberTo = "770387836960",
                 Amount = 100.0m,  
             };
-          
-            _mockService.Setup(service => service.Transfer(transferRequest))
+
+            var _mockWalletService = new Mock<IWalletInterface>();
+            _controller = new WalletController(_mockWalletService.Object);
+            _mockWalletService.Setup(service => service.Transfer(transferRequest))
                              .ReturnsAsync((int)TransactionResponseEnums.FAILED);
 
             // Act
@@ -503,13 +502,10 @@ namespace WalletTest
             // Arrange
             var transferRequest = new Transfer
             {
-                AccountNumberFrom = "existingAccount1",
-                AccountNumberTo = "existingAccount2",
+                AccountNumberFrom = "681398981506",
+                AccountNumberTo = "770387836960",
                 Amount = 100.0m, 
-            };
-           
-            _mockService.Setup(service => service.Transfer(transferRequest))
-                             .ReturnsAsync((int)TransactionResponseEnums.SUCCESS);
+            };         
 
             // Act
             var result = await _controller.Transfer(transferRequest);
@@ -526,12 +522,14 @@ namespace WalletTest
             // Arrange
             var transferRequest = new Transfer
             {
-                AccountNumberFrom = "existingAccount1",
-                AccountNumberTo = "existingAccount2",
+                AccountNumberFrom = "681398981506",
+                AccountNumberTo = "770387836960",
                 Amount = 100.0m,   
             };
-           
-            _mockService.Setup(service => service.Transfer(transferRequest))
+
+            var _mockWalletService = new Mock<IWalletInterface>();
+            _controller = new WalletController(_mockWalletService.Object);
+            _mockWalletService.Setup(service => service.Transfer(transferRequest))
                              .ThrowsAsync(new Exception("Some error occurred"));
 
             // Act
