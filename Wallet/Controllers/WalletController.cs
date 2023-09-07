@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using System.Data.SqlClient;
 using System.Security.Cryptography.Xml;
+using Wallet.Enums;
 using Wallet.Interfaces;
 using Wallet.Models;
 

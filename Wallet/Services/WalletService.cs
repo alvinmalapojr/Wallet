@@ -5,6 +5,7 @@ using Wallet.Models;
 using Polly;
 using Polly.Retry;
 using Wallet.Helper;
+using Wallet.Enums;
 
 namespace Wallet.Services
 {

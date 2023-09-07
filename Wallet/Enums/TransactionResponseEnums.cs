@@ -1,4 +1,4 @@
-﻿namespace Wallet.Models
+﻿namespace Wallet.Enums
 {
     public enum TransactionResponseEnums
     {

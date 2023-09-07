@@ -2,6 +2,7 @@
 using Microsoft.Extensions.Configuration;
 using Moq;
 using System.Threading.Tasks;
+using Wallet.Enums;
 using Wallet.Helper;
 using Wallet.Models;
 using Wallet.Services;

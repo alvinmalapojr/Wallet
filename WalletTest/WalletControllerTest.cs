@@ -8,6 +8,7 @@ using Wallet.Services;
 using System.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
 using Wallet.Helper;
+using Wallet.Enums;
 
 namespace WalletTest
 {
