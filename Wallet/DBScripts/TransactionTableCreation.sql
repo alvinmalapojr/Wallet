@@ -1,7 +1,7 @@
 USE [Wallet]
 GO
 
-/****** Object:  Table [dbo].[Transactions]    Script Date: 06/09/2023 3:09:13 pm ******/
+/****** Object:  Table [dbo].[Transactions]    Script Date: 07/09/2023 9:07:21 pm ******/
 SET ANSI_NULLS ON
 GO
 
@@ -18,6 +18,7 @@ CREATE TABLE [dbo].[Transactions](
 	[EndingBalance] [decimal](18, 2) NOT NULL,
 	[Status] [nvarchar](50) NOT NULL,
 	[TransactionDate] [datetime] NOT NULL,
+	[LastModifiedTimestamp] [timestamp] NOT NULL,
  CONSTRAINT [PK_Transaction_1] PRIMARY KEY CLUSTERED 
 (
 	[Id] ASC

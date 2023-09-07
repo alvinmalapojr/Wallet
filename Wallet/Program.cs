@@ -1,3 +1,4 @@
+using Wallet.Helper;
 using Wallet.Interfaces;
 using Wallet.Services;
 
@@ -10,6 +11,7 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddTransient<IWalletInterface, WalletService>();
+builder.Services.AddSingleton<TransactionRetryPolicy>();
 
 var app = builder.Build();
 

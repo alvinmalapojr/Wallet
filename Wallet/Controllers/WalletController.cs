@@ -90,6 +90,7 @@ namespace Wallet.Controllers
             try
             {
                 if (string.IsNullOrEmpty(user.Password)) return BadRequest("Password is Required");
+                if (string.IsNullOrEmpty(user.UserName)) return BadRequest("Username is Required");
 
                 var users = await _walletService.Register(user);
                 switch (users)
@@ -122,6 +123,8 @@ namespace Wallet.Controllers
                         return BadRequest("Balance Insufficient");
                     case (int)TransactionResponseEnums.FAILED:
                         return BadRequest("Transaction Failed");
+                    case (int)TransactionResponseEnums.DEADLOCK_RETRY:
+                        return BadRequest("Deadlock. Transaction Failed");
                     default:
                         return Ok("Transaction Successful");
                 }
@@ -144,6 +147,8 @@ namespace Wallet.Controllers
                         return Conflict("Account Number does not exist");
                     case (int)TransactionResponseEnums.FAILED:
                         return BadRequest("Transaction Failed");
+                    case (int)TransactionResponseEnums.DEADLOCK_RETRY:
+                        return BadRequest("Deadlock. Transaction Failed");
                     default:
                         return Ok("Transaction Successful");
                 }
@@ -169,6 +174,8 @@ namespace Wallet.Controllers
                         return BadRequest("Balance Insufficient");
                     case (int)TransactionResponseEnums.FAILED:
                         return BadRequest("Transaction Failed");
+                    case (int)TransactionResponseEnums.DEADLOCK_RETRY:
+                        return BadRequest("Deadlock. Transaction Failed");
                     default:
                         return Ok("Transaction Successful");
                 }

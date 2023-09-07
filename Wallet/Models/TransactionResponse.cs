@@ -6,6 +6,7 @@
         BALANCE_INSUFFICIENT,
         SUCCESS,
         FAILED,
-        USERNAME_EXIST
+        USERNAME_EXIST,
+        DEADLOCK_RETRY
     }
 }

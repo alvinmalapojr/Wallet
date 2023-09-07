@@ -7,6 +7,7 @@ using FluentAssertions;
 using Wallet.Services;
 using System.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
+using Wallet.Helper;
 
 namespace WalletTest
 {
@@ -15,13 +16,15 @@ namespace WalletTest
         private  IConfiguration _testConfiguration;
         private  WalletController _controller;
         private  IWalletInterface _walletService;
+        private  TransactionRetryPolicy _retryPolicy;
 
         public WalletControllerTest()
         {
             _testConfiguration = new ConfigurationBuilder()
                 .AddJsonFile("appsettings.json")
                 .Build();
-            _walletService = new WalletService(_testConfiguration);
+            _retryPolicy = new TransactionRetryPolicy();
+            _walletService = new WalletService(_testConfiguration, _retryPolicy);
             _controller = new WalletController(_walletService);
         }
 
@@ -149,6 +152,11 @@ namespace WalletTest
                 LastName = "last",
                 Password = "validpassword",
             };
+
+            var _mockWalletService = new Mock<IWalletInterface>();
+            _controller = new WalletController(_mockWalletService.Object);
+            _mockWalletService.Setup(service => service.Register(validUser))
+                             .ReturnsAsync((int)TransactionResponseEnums.SUCCESS);
 
             // Act
             var result = await _controller.Register(validUser);

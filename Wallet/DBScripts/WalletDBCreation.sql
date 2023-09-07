@@ -1,7 +1,7 @@
 USE [master]
 GO
 
-/****** Object:  Database [Wallet]    Script Date: 06/09/2023 3:08:52 pm ******/
+/****** Object:  Database [Wallet]    Script Date: 07/09/2023 9:07:58 pm ******/
 CREATE DATABASE [Wallet]
  CONTAINMENT = NONE
  ON  PRIMARY 
