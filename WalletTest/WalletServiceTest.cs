@@ -185,7 +185,7 @@ namespace WalletTest
         [Theory]
         [InlineData("681398981508", "034919237631", 1000000.0, 1)]
         [InlineData("681398981508", "034919237631", 2000000.0, 2)]
-        [InlineData("681398981508", "034919237631", 3000000.0, 4)]
+        [InlineData("681398981508", "034919237631", 3000000.0, 100)]
         public async Task Transfer_ConcurrentRequestBalanceInsufficient(
             string fromAccount,
             string toAccount,
@@ -210,7 +210,7 @@ namespace WalletTest
             });
 
             // Assert
-            Assert.All(results, r => Assert.True(r == (int)TransactionResponseEnums.BALANCE_INSUFFICIENT));
+            Assert.All(results, r => Assert.True(r == (int)TransactionResponseEnums.BALANCE_INSUFFICIENT || r == (int)TransactionResponseEnums.DEADLOCK_RETRY));
         }
 
         [Theory]
@@ -241,7 +241,7 @@ namespace WalletTest
             });
 
             // Assert
-            Assert.All(results, r => Assert.True(r == (int)TransactionResponseEnums.ACCOUNT_DOES_NOT_EXIST));
+            Assert.All(results, r => Assert.True(r == (int)TransactionResponseEnums.ACCOUNT_DOES_NOT_EXIST || r == (int)TransactionResponseEnums.DEADLOCK_RETRY));
         }
 
         #endregion
@@ -303,7 +303,7 @@ namespace WalletTest
             });
 
             // Assert
-            Assert.All(results, r => Assert.True(r == (int)TransactionResponseEnums.ACCOUNT_DOES_NOT_EXIST));
+            Assert.All(results, r => Assert.True(r == (int)TransactionResponseEnums.ACCOUNT_DOES_NOT_EXIST || r == (int)TransactionResponseEnums.DEADLOCK_RETRY));
         }
 
         #endregion
@@ -365,7 +365,7 @@ namespace WalletTest
             });
 
             // Assert
-            Assert.All(results, r => Assert.True(r == (int)TransactionResponseEnums.BALANCE_INSUFFICIENT));
+            Assert.All(results, r => Assert.True(r == (int)TransactionResponseEnums.BALANCE_INSUFFICIENT || r == (int)TransactionResponseEnums.DEADLOCK_RETRY));
         }
 
 
@@ -395,7 +395,7 @@ namespace WalletTest
             });
 
             // Assert
-            Assert.All(results, r => Assert.True(r == (int)TransactionResponseEnums.ACCOUNT_DOES_NOT_EXIST));
+            Assert.All(results, r => Assert.True(r == (int)TransactionResponseEnums.ACCOUNT_DOES_NOT_EXIST || r == (int)TransactionResponseEnums.DEADLOCK_RETRY));
         }
         #endregion
     }

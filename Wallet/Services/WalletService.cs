@@ -412,7 +412,6 @@ namespace Wallet.Services
                         if (deadlockRetryStatus == (int)TransactionResponseEnums.DEADLOCK_RETRY && retryCount < maxRetryAttempts)
                         {
                             retryCount++;
-                            return deadlockRetryStatus;
                         }
 
                         return deadlockRetryStatus;
