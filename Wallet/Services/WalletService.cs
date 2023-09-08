@@ -334,45 +334,6 @@ namespace Wallet.Services
             }
         }
 
-        //private async Task<int> ExecuteTransaction(SqlConnection connection, SqlTransaction transaction, string transactionNumber, string accountNumberFrom, string accountNumberTo, string transactionType, decimal amount, decimal endBalance, decimal endToBalance = 0)
-        //{
-        //    const int maxRetryAttempts = 3;
-        //    var retryPolicy = _retryPolicy.CreateSqlRetryPolicy(maxRetryAttempts);
-
-        //    return await retryPolicy.ExecuteAsync(async () =>
-        //    {
-        //        try
-        //        {
-        //            int isInsert = await ExecuteInsertTransaction(connection,
-        //                                    transaction,
-        //                                    transactionNumber,
-        //                                    accountNumberFrom,
-        //                                    accountNumberTo,
-        //                                    transactionType,
-        //                                    amount,
-        //                                    endBalance,
-        //                                    endToBalance);
-
-        //            return isInsert;
-
-        //        }
-        //        catch (SqlException ex)
-        //        {
-        //            if (IsConcurrencyException(ex))
-        //            {
-        //                throw;
-        //            }
-
-        //            if (transaction != null)
-        //            {
-        //                await transaction.RollbackAsync();
-        //            }
-        //        }
-
-        //        return (int)TransactionResponseEnums.FAILED;
-        //    });
-        //}
-
         private async Task<int> ExecuteTransaction(SqlConnection connection, string transactionNumber, string accountNumberFrom, string accountNumberTo, string transactionType, decimal amount)
         {
             const int maxRetryAttempts = 3;
