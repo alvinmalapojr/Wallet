@@ -152,9 +152,9 @@ namespace WalletTest
         #region Transfer
 
         [Theory]
-        [InlineData("681398981508", "681398981507", 10.0, 1)]
-        [InlineData("681398981508", "681398981507", 20.0, 2)]
-        [InlineData("681398981508", "681398981507", 5.0, 4)]
+        [InlineData("700296587887", "681398981507", 10.0, 1)]
+        [InlineData("700296587887", "681398981507", 20.0, 2)]
+        [InlineData("700296587887", "681398981507", 5.0, 10)]
         public async Task Transfer_ConcurrentRequestSuccessOrDeadLock(
             string fromAccount,
             string toAccount,
@@ -183,9 +183,9 @@ namespace WalletTest
         }
 
         [Theory]
-        [InlineData("681398981508", "toAccount", 1000000.0, 1)]
-        [InlineData("681398981508", "toAccount", 2000000.0, 2)]
-        [InlineData("681398981508", "toAccount", 3000000.0, 4)]
+        [InlineData("681398981508", "034919237631", 1000000.0, 1)]
+        [InlineData("681398981508", "034919237631", 2000000.0, 2)]
+        [InlineData("681398981508", "034919237631", 3000000.0, 4)]
         public async Task Transfer_ConcurrentRequestBalanceInsufficient(
             string fromAccount,
             string toAccount,

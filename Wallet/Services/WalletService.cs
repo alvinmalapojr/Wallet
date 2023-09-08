@@ -6,6 +6,8 @@ using Polly;
 using Polly.Retry;
 using Wallet.Helper;
 using Wallet.Enums;
+using System.Collections.Generic;
+using System.Data;
 
 namespace Wallet.Services
 {
@@ -28,7 +30,7 @@ namespace Wallet.Services
             const int maxRetryAttempts = 3;
             var retryPolicy = _retryPolicy.CreateSqlRetryPolicy(maxRetryAttempts);
 
-            #pragma warning disable CS8603
+#pragma warning disable CS8603
             return await retryPolicy.ExecuteAsync(async () =>
             {
                 List<Transaction> transactions = new List<Transaction>();
@@ -61,7 +63,7 @@ namespace Wallet.Services
                 }
                 return transactions;
             });
-            #pragma warning restore CS8603
+#pragma warning restore CS8603
         }
 
         public async Task<List<Transaction>> GetTransactions(string accountNumber)
@@ -69,7 +71,7 @@ namespace Wallet.Services
             const int maxRetryAttempts = 3;
             var retryPolicy = _retryPolicy.CreateSqlRetryPolicy(maxRetryAttempts);
 
-            #pragma warning disable CS8603
+#pragma warning disable CS8603
             return await retryPolicy.ExecuteAsync(async () =>
             {
                 List<Transaction> transactions = new List<Transaction>();
@@ -107,7 +109,7 @@ namespace Wallet.Services
                 }
                 return transactions;
             });
-            #pragma warning restore CS8603
+#pragma warning restore CS8603
         }
 
         public async Task<List<User>> GetUser()
@@ -115,7 +117,7 @@ namespace Wallet.Services
             const int maxRetryAttempts = 3;
             var retryPolicy = _retryPolicy.CreateSqlRetryPolicy(maxRetryAttempts);
 
-            #pragma warning disable CS8603
+#pragma warning disable CS8603
             return await retryPolicy.ExecuteAsync(async () =>
             {
                 List<User> users = new List<User>();
@@ -147,7 +149,7 @@ namespace Wallet.Services
 
                 return users;
             });
-            #pragma warning restore CS8603
+#pragma warning restore CS8603
         }
 
         public async Task<User> GetUser(string accountNumber)
@@ -155,7 +157,7 @@ namespace Wallet.Services
             const int maxRetryAttempts = 3;
             var retryPolicy = _retryPolicy.CreateSqlRetryPolicy(maxRetryAttempts);
 
-            #pragma warning disable CS8603
+#pragma warning disable CS8603
             return await retryPolicy.ExecuteAsync(async () =>
             {
                 List<User> users = new List<User>();
@@ -192,7 +194,7 @@ namespace Wallet.Services
                 }
                 return users.FirstOrDefault();
             });
-            #pragma warning restore CS8603
+#pragma warning restore CS8603
         }
 
         public async Task<int> Register(Registration registration)
@@ -260,29 +262,26 @@ namespace Wallet.Services
             {
                 await connection.OpenAsync();
 
-                decimal fromBalance = await GetBalance(connection, transfer.AccountNumberFrom);
-                if (fromBalance == -1)
-                {
-                    return (int)TransactionResponseEnums.ACCOUNT_DOES_NOT_EXIST;
-                }
-                if (fromBalance < transfer.Amount)
-                {
-                    return (int)TransactionResponseEnums.BALANCE_INSUFFICIENT;
-                }
-
-                decimal endtoBalance = await GetBalance(connection, transfer.AccountNumberTo);
-                if (endtoBalance == -1)
-                {
-                    return (int)TransactionResponseEnums.ACCOUNT_DOES_NOT_EXIST;
-                }
-
                 string transactionNumber = await GenerateTransactionNumber(connection);
-                decimal endBalance = fromBalance - transfer.Amount;
-                endtoBalance = endtoBalance + transfer.Amount;
 
-                return await ExecuteTransaction(connection, transactionNumber, transfer.AccountNumberFrom, transfer.AccountNumberTo, TransactionTypeEnums.TRANSFER.ToString(), transfer.Amount, endBalance, endtoBalance);       
+                try
+                {
+                    int isInsert = await ExecuteTransaction(connection,
+                                        transactionNumber,
+                                        transfer.AccountNumberFrom,
+                                        transfer.AccountNumberTo,
+                                        TransactionTypeEnums.TRANSFER.ToString(),
+                                        transfer.Amount);
+
+                    return isInsert;
+                }
+                catch (SqlException)
+                {
+                    return (int)TransactionResponseEnums.FAILED;
+                }
             }
         }
+
 
         public async Task<int> Withdraw(Withdraw widthraw)
         {
@@ -290,20 +289,23 @@ namespace Wallet.Services
             {
                 await connection.OpenAsync();
 
-                decimal balance = await GetBalance(connection, widthraw.AccountNumber);
-                if (balance == -1)
-                {
-                    return (int)TransactionResponseEnums.ACCOUNT_DOES_NOT_EXIST;
-                }
-                if (balance < widthraw.Amount)
-                {
-                    return (int)TransactionResponseEnums.BALANCE_INSUFFICIENT;
-                }
-
                 string transactionNumber = await GenerateTransactionNumber(connection);
-                decimal endBalance = balance - widthraw.Amount;
 
-                return await ExecuteTransaction(connection, transactionNumber, widthraw.AccountNumber, "", TransactionTypeEnums.WITHDRAW.ToString(), widthraw.Amount, endBalance);
+                try
+                {
+                    int isInsert = await ExecuteTransaction(connection,
+                                            transactionNumber,
+                                            widthraw.AccountNumber,
+                                            "",
+                                            TransactionTypeEnums.WITHDRAW.ToString(),
+                                            widthraw.Amount);
+
+                    return isInsert;
+                }
+                catch (SqlException)
+                {
+                    return (int)TransactionResponseEnums.FAILED;
+                }
             }
         }
 
@@ -312,136 +314,66 @@ namespace Wallet.Services
             using (SqlConnection connection = new SqlConnection(connectionString))
             {
                 await connection.OpenAsync();
-
-                bool isAccountNumberExist = await IsAccountNumberExists(deposit.AccountNumber, connection);
-                if (!isAccountNumberExist)
-                {
-                    return (int)TransactionResponseEnums.ACCOUNT_DOES_NOT_EXIST;
-                }
-
-                decimal balance = await GetBalance(connection, deposit.AccountNumber);
                 string transactionNumber = await GenerateTransactionNumber(connection);
-                decimal endBalance = balance + deposit.Amount;
 
-                return await ExecuteTransaction(connection, transactionNumber, deposit.AccountNumber, "", TransactionTypeEnums.DEPOSIT.ToString(), deposit.Amount, endBalance);
+                try
+                {
+                    int isInsert = await ExecuteTransaction(connection,
+                                            transactionNumber,
+                                            deposit.AccountNumber,
+                                            "",
+                                            TransactionTypeEnums.DEPOSIT.ToString(),
+                                            deposit.Amount);
+
+                    return isInsert;
+                }
+                catch (SqlException)
+                {
+                    return (int)TransactionResponseEnums.FAILED;
+                }
             }
         }
 
-        private async Task<int> ExecuteTransaction(SqlConnection connection, string transactionNumber, string accountNumberFrom, string accountNumberTo, string transactionType, decimal amount, decimal endBalance, decimal endToBalance = 0)
-        {
-            const int maxRetryAttempts = 3;
-            var retryPolicy = _retryPolicy.CreateSqlRetryPolicy(maxRetryAttempts);
+        //private async Task<int> ExecuteTransaction(SqlConnection connection, SqlTransaction transaction, string transactionNumber, string accountNumberFrom, string accountNumberTo, string transactionType, decimal amount, decimal endBalance, decimal endToBalance = 0)
+        //{
+        //    const int maxRetryAttempts = 3;
+        //    var retryPolicy = _retryPolicy.CreateSqlRetryPolicy(maxRetryAttempts);
 
-            return await retryPolicy.ExecuteAsync(async () =>
-            {
-                using (SqlTransaction transaction = connection.BeginTransaction())
-                {
-                    try
-                    {
-                        bool isInsert = await ExecuteInsertTransaction(connection, transaction, transactionNumber, accountNumberFrom, accountNumberTo, transactionType, amount, endBalance);
-                        int isUpdate = await ExecuteUpdateFromBalance(connection, transaction, accountNumberFrom, endBalance);
+        //    return await retryPolicy.ExecuteAsync(async () =>
+        //    {
+        //        try
+        //        {
+        //            int isInsert = await ExecuteInsertTransaction(connection,
+        //                                    transaction,
+        //                                    transactionNumber,
+        //                                    accountNumberFrom,
+        //                                    accountNumberTo,
+        //                                    transactionType,
+        //                                    amount,
+        //                                    endBalance,
+        //                                    endToBalance);
 
-                        bool isUpdateSuccess = false;
-                        switch (isUpdate)
-                        {
-                            case (int)TransactionResponseEnums.SUCCESS:
-                                isUpdateSuccess = true;
-                                break;
-                            case (int)TransactionResponseEnums.FAILED:
-                                isUpdateSuccess = false;
-                                break;
-                            case (int)TransactionResponseEnums.DEADLOCK_RETRY:
-                                await transaction.RollbackAsync();
-                                return (int)TransactionResponseEnums.DEADLOCK_RETRY;
-                            default:
-                                break;
-                        }
+        //            return isInsert;
 
-                        bool success = isInsert && isUpdateSuccess;
+        //        }
+        //        catch (SqlException ex)
+        //        {
+        //            if (IsConcurrencyException(ex))
+        //            {
+        //                throw;
+        //            }
 
-                        if (success)
-                        {
-                            if (transactionType == TransactionTypeEnums.TRANSFER.ToString() &&
-                                await ExecuteUpdateToBalance(connection, transaction, accountNumberTo, endToBalance))
-                            {
-                                success = await ExecuteUpdateTransactionStatus(connection, transaction, transactionNumber);
-                            }
-                            else if (transactionType != TransactionTypeEnums.TRANSFER.ToString())
-                            {
-                                success = await ExecuteUpdateTransactionStatus(connection, transaction, transactionNumber);
-                            }
+        //            if (transaction != null)
+        //            {
+        //                await transaction.RollbackAsync();
+        //            }
+        //        }
 
-                            if (success)
-                            {
-                                transaction.Commit();
-                                return (int)TransactionResponseEnums.SUCCESS;
-                            }
-                        }
-                    }
-                    catch (SqlException ex)
-                    {
-                        if (IsConcurrencyException(ex))
-                        {
-                            throw;
-                        }
+        //        return (int)TransactionResponseEnums.FAILED;
+        //    });
+        //}
 
-                        if (transaction != null)
-                        {
-                            await transaction.RollbackAsync();
-                        }
-                    }
-                }
-                return (int)TransactionResponseEnums.FAILED;
-            });
-        }
-
-        private async Task<bool> ExecuteInsertTransaction(SqlConnection connection, SqlTransaction transaction, string transactionNumber, string accountNumberFrom, string accountNumberTo, string transactionType, decimal amount, decimal endBalance)
-        {
-            const int maxRetryAttempts = 3;
-            var retryPolicy = _retryPolicy.CreateSqlRetryPolicy(maxRetryAttempts);
-
-            return await retryPolicy.ExecuteAsync(async () =>
-            {
-                using (SqlCommand insertCommand = connection.CreateCommand())
-                {
-                    try
-                    {
-                        insertCommand.Transaction = transaction;
-                        insertCommand.CommandText = "INSERT INTO Transactions (TransactionNumber, AccountNumberFrom, AccountNumberTo, TransactionType, Amount, EndingBalance, Status, TransactionDate) VALUES (@TransactionNumber, @AccountNumberFrom, @AccountNumberTo, @TransactionType, @Amount, @EndingBalance, @Status, @TransactionDate)";
-                        insertCommand.Parameters.AddWithValue("@TransactionNumber", transactionNumber);
-                        insertCommand.Parameters.AddWithValue("@AccountNumberFrom", accountNumberFrom);
-                        insertCommand.Parameters.AddWithValue("@AccountNumberTo", accountNumberTo);
-                        insertCommand.Parameters.AddWithValue("@TransactionType", transactionType);
-                        insertCommand.Parameters.AddWithValue("@Amount", amount);
-                        insertCommand.Parameters.AddWithValue("@EndingBalance", endBalance);
-                        insertCommand.Parameters.AddWithValue("@Status", StatusEnums.PENDING.ToString());
-                        insertCommand.Parameters.AddWithValue("@TransactionDate", DateTime.Now);
-
-                        int rowsAffected = await insertCommand.ExecuteNonQueryAsync();
-                        if (rowsAffected <= 0)
-                        {
-                            transaction.Rollback();
-                            return false;
-                        }
-
-                        return true;
-                    }
-                    catch (SqlException ex)
-                    {
-                        if (IsConcurrencyException(ex))
-                        {
-                            throw;
-                        }
-                        else
-                        {
-                            return false;
-                        }
-                    }
-                }
-            });
-        }
-
-        private async Task<int> ExecuteUpdateFromBalance(SqlConnection connection, SqlTransaction transaction, string accountNumberFrom, decimal endBalance)
+        private async Task<int> ExecuteTransaction(SqlConnection connection, string transactionNumber, string accountNumberFrom, string accountNumberTo, string transactionType, decimal amount)
         {
             const int maxRetryAttempts = 3;
             var retryPolicy = _retryPolicy.CreateSqlRetryPolicy(maxRetryAttempts);
@@ -449,38 +381,47 @@ namespace Wallet.Services
 
             return await retryPolicy.ExecuteAsync(async () =>
             {
-                using (SqlCommand updateFromBalanceCommand = connection.CreateCommand())
+                using (SqlCommand insertCommand = connection.CreateCommand())
                 {
                     try
                     {
-                        var getFromTimestampUser = await GetLastModifiedTimestampUsers(accountNumberFrom, connection, transaction);
-
-                        updateFromBalanceCommand.Transaction = transaction;
-                        updateFromBalanceCommand.CommandText = "UPDATE Users SET Balance = @Balance WHERE AccountNumber = @AccountNumberFrom AND LastModifiedTimestamp = @LastModifiedTimestamp";
-                        updateFromBalanceCommand.Parameters.AddWithValue("@AccountNumberFrom", accountNumberFrom);
-                        updateFromBalanceCommand.Parameters.AddWithValue("@Balance", endBalance);
-                        updateFromBalanceCommand.Parameters.AddWithValue("@LastModifiedTimestamp", getFromTimestampUser);
-
-                        int rowFromBalanceAffected = await updateFromBalanceCommand.ExecuteNonQueryAsync();
-
-                        if (rowFromBalanceAffected <= 0)
+                        if (transactionType == TransactionTypeEnums.TRANSFER.ToString())
                         {
-                            transaction.Rollback();
-                            return (int)TransactionResponseEnums.FAILED;
+                            insertCommand.CommandText = GetTransferQuery();
+                        }
+                        else
+                        {
+                            insertCommand.CommandText = GetWithdrawOrDepositQuery();
                         }
 
-                        return (int)TransactionResponseEnums.SUCCESS;
-                    }
-                    catch (SqlException ex)
-                    {
-                        if (IsConcurrencyException(ex))
-                        {
-                            throw;
-                        }
-                        else if (IsDeadlockException(ex) && retryCount < maxRetryAttempts)
+                        insertCommand.Parameters.AddWithValue("@TransactionNumber", transactionNumber);
+                        insertCommand.Parameters.AddWithValue("@AccountNumberFrom", accountNumberFrom);
+                        insertCommand.Parameters.AddWithValue("@AccountNumberTo", accountNumberTo);
+                        insertCommand.Parameters.AddWithValue("@TransactionType", transactionType);
+                        insertCommand.Parameters.AddWithValue("@Amount", amount);
+                        insertCommand.Parameters.AddWithValue("@Status", StatusEnums.SUCCESS.ToString());
+                        insertCommand.Parameters.AddWithValue("@TransactionDate", DateTime.Now);
+
+                        SqlParameter deadlockRetryParam = new SqlParameter("@DeadlockRetry", SqlDbType.Int);
+                        deadlockRetryParam.Direction = ParameterDirection.Output;
+                        insertCommand.Parameters.Add(deadlockRetryParam);
+
+                        await insertCommand.ExecuteNonQueryAsync();
+                        int deadlockRetryStatus = (int)deadlockRetryParam.Value;
+
+                        if (deadlockRetryStatus == (int)TransactionResponseEnums.DEADLOCK_RETRY && retryCount < maxRetryAttempts)
                         {
                             retryCount++;
-                            return (int)TransactionResponseEnums.DEADLOCK_RETRY;
+                            return deadlockRetryStatus;
+                        }
+
+                        return deadlockRetryStatus;
+                    }
+                    catch (SqlException ex)
+                    {
+                        if (IsConcurrencyException(ex))
+                        {
+                            throw;
                         }
                         else
                         {
@@ -491,111 +432,135 @@ namespace Wallet.Services
             });
         }
 
-        private async Task<bool> ExecuteUpdateToBalance(SqlConnection connection, SqlTransaction transaction, string accountNumberTo, decimal endToBalance)
+        public string GetTransferQuery()
         {
-            const int maxRetryAttempts = 3;
-            var retryPolicy = _retryPolicy.CreateSqlRetryPolicy(maxRetryAttempts);
+            var query = @"                            
+                                BEGIN TRY
+                                    BEGIN TRANSACTION;
 
-            return await retryPolicy.ExecuteAsync(async () =>
-            {
-                using (SqlCommand updateToBalanceCommand = connection.CreateCommand())
-                {
-                    try
-                    {
-                        var getToTimestampUser = await GetLastModifiedTimestampUsers(accountNumberTo, connection, transaction);
+                                    DECLARE @FromBalance DECIMAL(18, 2);
+                                    DECLARE @ToBalance DECIMAL(18, 2);
+                                    DECLARE @EndingBalance DECIMAL(18, 2);
+                                    DECLARE @EndingToBalance DECIMAL(18, 2);
 
-                        updateToBalanceCommand.Transaction = transaction;
-                        updateToBalanceCommand.CommandText = "UPDATE Users SET Balance = @Balance WHERE AccountNumber = @AccountNumberTo AND LastModifiedTimestamp = @LastModifiedTimestamp";
-                        updateToBalanceCommand.Parameters.AddWithValue("@AccountNumberTo", accountNumberTo);
-                        updateToBalanceCommand.Parameters.AddWithValue("@Balance", endToBalance);
-                        updateToBalanceCommand.Parameters.AddWithValue("@LastModifiedTimestamp", getToTimestampUser);
+                                    SELECT @FromBalance = Balance FROM Users WITH (UPDLOCK) WHERE AccountNumber = @AccountNumberFrom;
+                                    SELECT @ToBalance = Balance FROM Users WITH (UPDLOCK) WHERE AccountNumber = @AccountNumberTo;
 
-                        int rowToBalanceAffected = await updateToBalanceCommand.ExecuteNonQueryAsync();
+                                    IF @FromBalance IS NULL OR @ToBalance IS NULL
+                                    BEGIN
+                                        ROLLBACK TRANSACTION;
+                                        SET @DeadlockRetry =" + (int)TransactionResponseEnums.ACCOUNT_DOES_NOT_EXIST + @";
+                                        RETURN;
+                                    END
 
-                        if (rowToBalanceAffected <= 0)
-                        {
-                            transaction.Rollback();
-                            return false;
-                        }
+                                    IF @FromBalance < @Amount
+                                    BEGIN
+                                        ROLLBACK TRANSACTION;
+                                        SET @DeadlockRetry =" + (int)TransactionResponseEnums.BALANCE_INSUFFICIENT + @";
+                                        RETURN;
+                                    END
 
-                        return true;
-                    }
-                    catch (SqlException ex)
-                    {
-                        if (IsConcurrencyException(ex))
-                        {
-                            throw;
-                        }
-                        else
-                        {
-                            return false;
-                        }
-                    }
-                }
-            });
+                                    SET @EndingBalance = @FromBalance - @Amount;
+                                    SET @EndingToBalance = @ToBalance + @Amount;
+
+                                    INSERT INTO Transactions (TransactionNumber, AccountNumberFrom, AccountNumberTo, TransactionType, Amount, EndingBalance, Status, TransactionDate)
+                                    VALUES (@TransactionNumber, @AccountNumberFrom, @AccountNumberTo, @TransactionType, @Amount, @EndingBalance, @Status, @TransactionDate);
+
+                                    UPDATE Users WITH (UPDLOCK)
+                                    SET Balance = @EndingBalance
+                                    WHERE AccountNumber = @AccountNumberFrom;
+
+                                    UPDATE Users WITH (UPDLOCK)
+                                    SET Balance = @EndingToBalance
+                                    WHERE AccountNumber = @AccountNumberTo;
+
+                                    COMMIT TRANSACTION;
+
+                                    SET @DeadlockRetry = " + (int)TransactionResponseEnums.SUCCESS + @"
+                                END TRY
+                                BEGIN CATCH
+                                    IF ERROR_NUMBER() = 1205 -- SQL Server deadlock error code
+                                    BEGIN
+                                        ROLLBACK TRANSACTION;
+                                        SET @DeadlockRetry = " + (int)TransactionResponseEnums.DEADLOCK_RETRY + @";
+                                    END
+                                    ELSE
+                                    BEGIN
+                                        ROLLBACK TRANSACTION;
+                                        SET @DeadlockRetry = " + (int)TransactionResponseEnums.FAILED + @";
+                                        THROW;
+                                    END
+                                END CATCH
+
+                                SELECT @DeadlockRetry AS DeadlockRetry;
+                            ";
+
+            return query;
         }
 
-        private async Task<bool> ExecuteUpdateTransactionStatus(SqlConnection connection, SqlTransaction transaction, string transactionNumber)
+        public string GetWithdrawOrDepositQuery() 
         {
-            const int maxRetryAttempts = 3;
-            var retryPolicy = _retryPolicy.CreateSqlRetryPolicy(maxRetryAttempts);
+            var query = @"                            
+                                BEGIN TRY
+                                    BEGIN TRANSACTION;
 
-            return await retryPolicy.ExecuteAsync(async () =>
-            {
-                using (SqlCommand updateTransactionStatusCommand = connection.CreateCommand())
-                {
-                    try
-                    {
-                        var getToTimestampTransaction = await GetLastModifiedTimestampTransactions(transactionNumber, connection, transaction);
+                                    DECLARE @FromBalance DECIMAL(18, 2);
+                                    DECLARE @EndingBalance DECIMAL(18, 2);
 
-                        updateTransactionStatusCommand.Transaction = transaction;
-                        updateTransactionStatusCommand.CommandText = "UPDATE Transactions SET Status = @Status WHERE TransactionNumber = @TransactionNumber AND LastModifiedTimestamp = @LastModifiedTimestamp";
-                        updateTransactionStatusCommand.Parameters.AddWithValue("@TransactionNumber", transactionNumber);
-                        updateTransactionStatusCommand.Parameters.AddWithValue("@Status", StatusEnums.SUCCESS.ToString());
-                        updateTransactionStatusCommand.Parameters.AddWithValue("@LastModifiedTimestamp", getToTimestampTransaction);
+                                    SELECT @FromBalance = Balance FROM Users WITH (UPDLOCK) WHERE AccountNumber = @AccountNumberFrom;
 
-                        int rowStatusAffected = await updateTransactionStatusCommand.ExecuteNonQueryAsync();
+                                    IF @FromBalance IS NULL
+                                    BEGIN
+                                        ROLLBACK TRANSACTION;
+                                        SET @DeadlockRetry =" + (int)TransactionResponseEnums.ACCOUNT_DOES_NOT_EXIST + @";
+                                        RETURN;
+                                    END
+        
+                                    IF @TransactionType = 'WITHDRAW' AND @FromBalance < @Amount
+                                    BEGIN
+                                        ROLLBACK TRANSACTION;
+                                        SET @DeadlockRetry =" + (int)TransactionResponseEnums.BALANCE_INSUFFICIENT + @";
+                                        RETURN;
+                                    END
 
-                        if (rowStatusAffected <= 0)
-                        {
-                            transaction.Rollback();
-                            return false;
-                        }
+                                    IF @TransactionType = 'WITHDRAW'
+                                    BEGIN
+                                        SET @EndingBalance = @FromBalance - @Amount;
+                                    END
+                                    ELSE
+                                    BEGIN
+                                        SET @EndingBalance = @FromBalance + @Amount;
+                                    END
+      
+                                    INSERT INTO Transactions (TransactionNumber, AccountNumberFrom, AccountNumberTo, TransactionType, Amount, EndingBalance, Status, TransactionDate)
+                                    VALUES (@TransactionNumber, @AccountNumberFrom, @AccountNumberTo, @TransactionType, @Amount, @EndingBalance, @Status, @TransactionDate);
 
-                        return true;
-                    }
-                    catch (SqlException ex)
-                    {
-                        if (IsConcurrencyException(ex))
-                        {
-                            throw;
-                        }
-                        else
-                        {
-                            return false;
-                        }
-                    }
-                }
-            });
-        }
+                                    UPDATE Users WITH (UPDLOCK)
+                                    SET Balance = @EndingBalance
+                                    WHERE AccountNumber = @AccountNumberFrom;
 
-        private async Task<decimal> GetBalance(SqlConnection connection, string accountNumber)
-        {
-            const int maxRetryAttempts = 3;
-            var retryPolicy = _retryPolicy.CreateSqlRetryPolicy(maxRetryAttempts);
+                                    COMMIT TRANSACTION;
+                                  
+                                    SET @DeadlockRetry = " + (int)TransactionResponseEnums.SUCCESS + @"
+                                END TRY
+                                BEGIN CATCH
+                                    IF ERROR_NUMBER() = 1205
+                                    BEGIN             
+                                        ROLLBACK TRANSACTION;
+                                        SET @DeadlockRetry = " + (int)TransactionResponseEnums.DEADLOCK_RETRY + @";
+                                    END
+                                    ELSE
+                                    BEGIN
+                                        ROLLBACK TRANSACTION;
+                                        SET @DeadlockRetry = " + (int)TransactionResponseEnums.FAILED + @";
+                                        THROW;
+                                    END
+                                END CATCH
 
-            decimal balance = await retryPolicy.ExecuteAsync(async () =>
-            {
-                string getBalanceQuery = "SELECT Balance FROM Users WHERE AccountNumber = @AccountNumber";
-                using (SqlCommand getBalanceCommand = new SqlCommand(getBalanceQuery, connection))
-                {
-                    getBalanceCommand.Parameters.AddWithValue("@AccountNumber", accountNumber);
-                    object balanceObject = await getBalanceCommand.ExecuteScalarAsync();
-                    return (balanceObject != null && balanceObject != DBNull.Value) ? (decimal)balanceObject : -1;
-                }
-            });
+                                SELECT @DeadlockRetry AS DeadlockRetry;
+                            ";
 
-            return balance;
+            return query;
         }
 
         private async Task<string> GenerateUniqueAccountNumber(SqlConnection connection)
@@ -632,8 +597,8 @@ namespace Wallet.Services
             var retryPolicy = _retryPolicy.CreateSqlRetryPolicy(maxRetryAttempts);
 
             bool isExist = await retryPolicy.ExecuteAsync(async () =>
-            {   
-               
+            {
+
                 string checkAccountNumberQuery = "SELECT COUNT(*) FROM Users WHERE AccountNumber = @AccountNumber";
                 using (SqlCommand checkAccountNumberCommand = new SqlCommand(checkAccountNumberQuery, connection))
                 {
@@ -728,9 +693,5 @@ namespace Wallet.Services
                    errorMessage.Contains("lock timeout");
         }
 
-        private bool IsDeadlockException(SqlException ex)
-        {
-            return ex.Number == 1205;
-        }
     }
 }
